@@ -24,21 +24,28 @@ async function run() {
     await client.connect();
     const productsCollection = client.db("brandDB").collection("brandProducts");
     const brandCollection = client.db("brandDB").collection("brands");
+    const addCartCollection = client.db("brandDB").collection("addCart");
 
     app.get("/brandProducts", async (req, res) => {
       const cursor = productsCollection.find();
       const result = await cursor.toArray();
       res.send(result);
     });
+
     app.get("/brandProducts/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await productsCollection.findOne(query);
-      res.send(result)
+      res.send(result);
     });
 
     app.get("/brands", async (req, res) => {
       const cursor = brandCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+    app.get("/addCart", async (req, res) => {
+      const cursor = addCartCollection.find();
       const result = await cursor.toArray();
       res.send(result);
     });
@@ -49,7 +56,21 @@ async function run() {
       const result = await productsCollection.insertOne(brand);
       res.send(result);
     });
-   
+
+    // post add cart products
+    app.post("/addCart", async (req, res) => {
+      const product = req.body;
+      const result = await addCartCollection.insertOne(product);
+      res.send(result);
+    });
+    // delete cart products
+    app.delete("/addCart/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: id };
+      const result = await addCartCollection.deleteOne(query);
+      res.send(result);
+    });
+
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
