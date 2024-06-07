@@ -70,6 +70,25 @@ async function run() {
       const result = await addCartCollection.deleteOne(query);
       res.send(result);
     });
+    app.put("/brandProducts/:id", async (req, res) => {
+      const id = req.params.id;
+      const updatedProduct = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updateProduct = {
+        $set: {
+          name: updatedProduct.name,
+          brand: updatedProduct.brand,
+          type: updatedProduct.type,
+          price: updatedProduct.price,
+          desc: updatedProduct.desc,
+          rating: updatedProduct.rating,
+          image: updatedProduct.image,
+        },
+      };
+      const result = await productsCollection.updateOne(filter, updateProduct, options);
+      res.send(result);
+    });
 
     await client.db("admin").command({ ping: 1 });
     console.log(
@@ -82,7 +101,7 @@ async function run() {
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
-  res.send("Server Running....");
+  res.send("Server is running..");
 });
 
 app.listen(port, () => {
