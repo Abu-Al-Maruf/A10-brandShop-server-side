@@ -6,7 +6,12 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "https://a10-brandshop.web.app"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.mrrlkes.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -21,7 +26,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     const productsCollection = client.db("brandDB").collection("brandProducts");
     const brandCollection = client.db("brandDB").collection("brands");
     const addCartCollection = client.db("brandDB").collection("addCart");
@@ -86,11 +91,15 @@ async function run() {
           image: updatedProduct.image,
         },
       };
-      const result = await productsCollection.updateOne(filter, updateProduct, options);
+      const result = await productsCollection.updateOne(
+        filter,
+        updateProduct,
+        options
+      );
       res.send(result);
     });
 
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
