@@ -2,6 +2,8 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -13,6 +15,7 @@ app.use(
   })
 );
 app.use(express.json());
+app.use(cookieParser());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.mrrlkes.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -24,12 +27,52 @@ const client = new MongoClient(uri, {
   },
 });
 
+// middleware for verify token
+const verifyToken = (req, res, next) => {
+  const token = req?.cookies?.token;
+  if (!token) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+
+  jwt.verify(token, process.env.SECRET_TOKEN, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ message: "unauthorized access" });
+    }
+    req.user = decoded;
+    next();
+  });
+};
+
 async function run() {
   try {
     // await client.connect();
     const productsCollection = client.db("brandDB").collection("brandProducts");
     const brandCollection = client.db("brandDB").collection("brands");
     const addCartCollection = client.db("brandDB").collection("addCart");
+
+    // auth related api
+
+    app.post("/jwt", async (req, res) => {
+      const userEmail = req.body;
+      const token = jwt.sign(userEmail, process.env.SECRET_TOKEN, {
+        expiresIn: "1h",
+      });
+
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "none",
+        })
+        .send({ success: true });
+    });
+
+    // clear api if no user found/logout
+    app.post("/logout", async (req, res) => {
+      const userEmail = req.body;
+      console.log("logged out", userEmail);
+      res.clearCookie("token", { maxAge: 0 }).send({ success: true });
+    });
 
     app.get("/brandProducts", async (req, res) => {
       const cursor = productsCollection.find();
@@ -49,16 +92,21 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     });
-    app.get("/addCart", async (req, res) => {
-      const cursor = addCartCollection.find();
-      const result = await cursor.toArray();
-      res.send(result);
-    });
+    // get addCart data 
+    app.get("/addCart", verifyToken, async (req, res) => {
+      const queryEmail = req.query?.email;
+      const tokenEmail = req.user?.email;
+      
+      if (queryEmail !== tokenEmail) {
+        return res.status(403).send({ message: "forbidden access" });
 
-    app.post("/brandProducts", async (req, res) => {
-      console.log("post hitted");
-      const brand = req.body;
-      const result = await productsCollection.insertOne(brand);
+      }
+
+      let queryObj = {};
+      if (req.query?.email) {
+        queryObj = { email: req.query.email };
+      }
+      const result = await addCartCollection.find(queryObj).toArray();
       res.send(result);
     });
 
@@ -68,10 +116,17 @@ async function run() {
       const result = await addCartCollection.insertOne(product);
       res.send(result);
     });
+
+    app.post("/brandProducts", async (req, res) => {
+      const brand = req.body;
+      const result = await productsCollection.insertOne(brand);
+      res.send(result);
+    });
+
     // delete cart products
     app.delete("/addCart/:id", async (req, res) => {
       const id = req.params.id;
-      const query = { _id: id };
+      const query = { _id: new ObjectId(id) };
       const result = await addCartCollection.deleteOne(query);
       res.send(result);
     });
