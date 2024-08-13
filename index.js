@@ -75,9 +75,18 @@ async function run() {
     });
 
     app.get("/brandProducts", async (req, res) => {
-      const cursor = productsCollection.find();
-      const result = await cursor.toArray();
-      res.send(result);
+      const page = Number(req.query?.page);
+      const limit = Number(req.query?.limit);
+      const skip = (page - 1) * limit;
+
+      const result = await productsCollection
+        .find()
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+
+      const count = await productsCollection.estimatedDocumentCount();
+      res.send({ result, count });
     });
 
     app.get("/brandProducts/:id", async (req, res) => {
@@ -92,14 +101,13 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     });
-    // get addCart data 
+    // get addCart data
     app.get("/addCart", verifyToken, async (req, res) => {
       const queryEmail = req.query?.email;
       const tokenEmail = req.user?.email;
-      
+
       if (queryEmail !== tokenEmail) {
         return res.status(403).send({ message: "forbidden access" });
-
       }
 
       let queryObj = {};
